@@ -74,7 +74,7 @@ module battleship::battleship {
 
     public entry fun new_game(state: &mut State, board_hash: u256, ctx: &mut TxContext) {
         // todo: verify proof
-        assert!(table::contains(&mut state.playing, tx_context::sender(ctx)), EPlaying);
+        assert!(!table::contains(&mut state.playing, tx_context::sender(ctx)), EPlaying);
         let game = Game {
             id: object::new(ctx),
             participants: vector::empty<address>(),
@@ -98,7 +98,7 @@ module battleship::battleship {
     }
 
     public entry fun join_game(state: &mut State, game_index: u256, board_hash: u256, ctx: &mut TxContext) {
-        assert!(table::contains(&mut state.playing, tx_context::sender(ctx)), EPlaying);
+        assert!(!table::contains(&mut state.playing, tx_context::sender(ctx)), EPlaying);
         assert!(table::contains(&mut state.games, game_index), EGameIndex);
         assert!(vector::length(&table::borrow_mut(&mut state.games, game_index).participants) == 1, EFullAccounts);
         // todo: verify proof
