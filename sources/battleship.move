@@ -82,7 +82,7 @@ module battleship::battleship {
             nonce: 0,
             shots: table::new(ctx),
             hits: table::new(ctx),
-            hit_nonce: vector::empty(),
+            hit_nonce: vector[0x0,0x0],
             winner: from_u256(0),
         };
         vector::push_back<address>(&mut game.participants, tx_context::sender(ctx));
@@ -113,23 +113,24 @@ module battleship::battleship {
         })
     }
 
-    public entry fun first_turn(state: &mut State, game_index: u256, shot: vector<u256>, ctx: &mut TxContext) {
+    public entry fun first_turn(state: &mut State, game_index: u256, shot_x: u256,shot_y:u256,ctx: &mut TxContext) {
         assert!(table::contains(&mut state.games, game_index), EGameIndex);
         let game: &mut Game = table::borrow_mut(&mut state.games, game_index);
         assert!(*table::borrow(&state.playing, tx_context::sender(ctx)) == game_index, EPlaying);
         assert!(game.winner == from_u256(0), EGameOver);
         assert!(game.nonce == 0, EFirstTurn);
+        let shot: vector<u256> = vector[shot_x,shot_y];
         table::add(&mut game.shots, game.nonce, shot);
         game.nonce = game.nonce + 1;
         // todo: emit event
         event::emit(ShotEvent{
-            x: *vector::borrow(&shot,0),
-            y: *vector::borrow(&shot,1),
+            x: shot_x,
+            y: shot_y,
             game_index
         });
     }
 
-    public entry fun turn(state: &mut State, game_index: u256, hit: bool, next: vector<u256>, ctx: &mut TxContext) {
+    public entry fun turn(state: &mut State, game_index: u256, hit: bool, next_x: u256,next_y: u256, ctx: &mut TxContext) {
         assert!(table::contains(&mut state.games, game_index), EGameIndex);
         let game: &mut Game = table::borrow_mut(&mut state.games, game_index);
         assert!(*table::borrow(&state.playing, tx_context::sender(ctx)) == game_index, EPlaying);
@@ -161,11 +162,12 @@ module battleship::battleship {
         if (*vector::borrow(&game.hit_nonce, i) >= HIT_MAX) {
             game_over(state, game_index);
         } else {
+            let next: vector<u256> = vector[next_x,next_y];
             table::add(&mut game.shots, game.nonce, next);
             game.nonce = game.nonce + 1;
             event::emit(ShotEvent{
-                x: *vector::borrow(&next,0),
-                y: *vector::borrow(&next,1),
+                x: next_x,
+                y: next_y,
                 game_index
             })
         }
