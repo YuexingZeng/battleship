@@ -1,56 +1,58 @@
-# battleship游戏介绍
-battleship是构建于零知识证明（groth16）体系之上的一个战舰游戏,对战双方在不知晓对方战舰摆放位置的情况下，每轮选择棋盘上的一个点进行射击，若击中对方战舰（该点坐标与对方的战舰所占的点的坐标重合），则计一分,分数达到设置的目标（最大击中次数）时，获得游戏胜利。
+# Battleship game on the Sui blockChain
+Battleship is a game of naval warfare built on the zero-knowledge proof (Groth16) system. In this game, two players engage in a battle without knowing the exact locations of each other's ships. Each player takes turns selecting a point on the board to fire upon. If a player hits an opponent's ship (the selected point overlaps with the coordinates of the opponent's ship), they score one point. The game is won when a player reaches the target score (maximum number of hits).
 
-游戏双方通过battleship合约进行交互，由于需要隐藏部分重要信息（双方战舰的摆放位置）,并约束双方遵循游戏规则，因此引入了groth16零知识证明系统。
+The two players in the game interact through the Battleship contract. Since it is necessary to hide some important information (the placement of each player's ships) and to ensure that both players follow the rules of the game, the Groth16 zero-knowledge proof system is introduced.
 
-## 棋盘与战舰坐标
+## Chessboard and Battleship Coordinates
 ![](./img/battleship.png)
-如上图所示，每个玩家需要摆放五艘战舰,战舰只能在开始游戏或加入游戏时摆放，一旦确定，后续无法改变战舰位置。五艘战舰的长度分别为5、4、3、3、2个单元格，战舰的坐标由x、y、z三个分量构成，其中(x,y)可以对应棋盘上的某个点，而z取值0或1，0表示战舰横向摆放，1表示战舰纵向摆放。给定战舰的坐标和长度，则可以计算战舰在棋盘中占据了哪些单元格。
+As shown in the picture above, each player needs to place five battleships. The battleships can only be placed when starting the game or joining the game. Once confirmed, the position of the battleship cannot be changed later. The lengths of the five warships are 5, 4, 3, 3, and 2 cells respectively. The coordinates of the warships are composed of three components x, y, and z, where (x, y) can correspond to a certain point on the chessboard, and The value of z is 0 or 1, 0 indicates that the battleship is placed horizontally, and 1 indicates that the battleship is placed vertically. Given the coordinates and length of a battleship, it is possible to calculate which cells the battleship occupies on the chessboard.
 
-## 电路
-在此游戏中，存在以下两个ZKP电路: board.circom和shot.circom。
+## Circuits
+In this game, there are two ZKP circuits: `board.circom` and `shot.circom`.
 
 ### board.circom
-此电路接收五艘战舰的坐标（ships:5*3数组,private）以及ships的hash(public)作为输入，验证战舰摆放符合游戏规则，具体检查如下:
-1. 检查战舰的位置范围(占据的单元格是否均未超过棋盘的范围)；
-2. 检查战舰是否碰撞，5艘战舰摆放不可以有重叠的单元格；
-3. 检查输入的hash值和ships是否对应，即Hash(ships)?=hash。
+This circuit takes as input the coordinates of the five ships (a 5x3 array, private) and the hash of the ships (public). It verifies that the placement of the ships conforms to the rules of the game, by performing the following checks:
+
+* Verifies that the ships are within the bounds of the chessboard (i.e., that they do not occupy cells outside of the chessboard).
+* Ensures that the ships do not overlap with each other (i.e., that no two ships occupy the same cell).
+* Checks that the input hash value corresponds to the given ships, i.e., that Hash(ships) = hash.
 
 ### shot.circom
-此电路接收ships(同上,private)、hash(同上,public)、shot(射击的点[x,y],public)和hit(取值1和0，是否击中战舰,public)作为输入，验证是否击中战舰，具体的检查规则如下:
-1. 检查shot是否落在棋盘范围内；
-2. 检查输入的hash值和ships是否对应，即Hash(ships)?=hash；
-3. 检查shot的坐标是否被包含在ships所占据的单元格中，然后根据检查结果，判断hit断言是否正确
+This circuit takes as input the ships (same as above, private), the hash of the ships (same as above, public), the coordinates of the shot (x,y, public), and whether or not the shot hit a ship (a value of 1 or 0, public). It verifies whether or not a ship was hit by the shot, according to the following rules:
 
-## 合约
-battleship game包含一个主合约和两个验证合约：`battleship.move`、`board_verifier.move`、`shot_verifier.move`
+* Verifies that the shot falls within the bounds of the chessboard.
+* Checks that the input hash value corresponds to the given ships, i.e., that Hash(ships) = hash.
+* Checks whether the coordinates of the shot are contained in any of the cells occupied by the ships. Based on the result of this check, the circuit evaluates the hit assertion to determine whether or not the shot hit a ship.
+
+## Contracts
+The Battleship game contains one main contract and two verification contracts：`battleship.move`、`board_verifier.move`、`shot_verifier.move`
 
 ### groth16 in move
-sui move的标准库提供了groth16的验证算法：见[groth16.move](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/crypto/groth16.move),因此可以将验证合约视为groth16协议中的验证者，即可调用验证合约来验证证明的有效性。
+The standard library of the SUI Move provides the Groth16 verification algorithm through[groth16.move](https://github.com/MystenLabs/sui/blob/main/crates/sui-framework/packages/sui-framework/sources/crypto/groth16.move),which allows the verification contracts to be considered as the verifiers in the Groth16 protocol. Thus, the verification contracts can be invoked to verify the validity of the proof.
 
-在部署合约之前，需要编译电路，并执行groth16协议的setup以生成proving key和verification key,可以借助以下工具:
+Before deploying the contract, the circuits needs to be compiled and the setup of the Groth16 protocol needs to be executed to generate the proving key and verification key. The following tools can be used for this purpose:
 
 * [circom](https://github.com/iden3/circom)
 * [snarkjs](https://github.com/iden3/snarkjs)
 
-生成verification key后，需要将`board_verifier.move`和`shot_verifier.move`中的`VK_BYTES`、`ALPHA_BYTES`、`GAMMA_BYTES`、`DELTA_BYTES`替换成verification key中的对应参数（需要序列化其中的参数，转成hex string类型）,此时`board_verifier.move`和`shot_verifier.move`才可充当一个“验证者”。值得注意的是，groth16的一个key只能对应一个电路，因此`board_verifier`和`shot_verifier`应是不同的verification key。参数的序列化参考[battleship test on sui blockchain](https://github.com/YuexingZeng/sui-test)
+After generating the verification key, the `VK_BYTES`, `ALPHA_BYTES`, `GAMMA_BYTES`, and `DELTA_BYTES` in `board_verifier.move` and `shot_verifier.move` need to be replaced with the corresponding parameters in the verification key (serialized to hex string format). Only then can board_verifier.move and shot_verifier.move act as verifiers. It is worth noting that one key in Groth16 can only correspond to one circuit. Therefore, board_verifier and shot_verifier should be different verification keys. The serialization of the parameters can be referenced in the[battleship test on sui blockchain](https://github.com/YuexingZeng/sui-test)
 
-`board_verifier.move`和`shot_verifier.move`通过调用groth16.move中的`verify_groth16_proof`函数验证相应的证明。
+`board_verifier.move` and `shot_verifier.move` verify the corresponding proofs by calling the `verify_groth16_proof` function in `groth16.move`.
 
 ### battleship.move
-此合约定义了battleship game的主要逻辑和规则。其中包含new_game、join_game、first_turn和turn这四个函数,下面主要说明这四个函数中是如何进行proof verify的,交互双方以Alice和Bob为例:
+This contract defines the main logic and rules of the battleship game. It includes four functions: `new_game`, `join_game`, `first_turn`, and `turn`. Below we will mainly explain how proof verification is conducted in these four functions, using Alice and Bob as examples:
 
-* new_game: Alice创建游戏,在调用此函数之前，需要为其摆放的ships生成witness和proof（可使用[snarkjs](https://github.com/iden3/snarkjs)）,new_game通过调用board_verifier合约验证其摆放的战舰位置符合规则，且不会透漏战舰的摆放位置；
+* new_game: Alice creates the game. Before calling this function, witness and proof need to be generated for the ships she places (using [snarkjs](https://github.com/iden3/snarkjs)).`new_game` verifies the placement of the battleships by calling the `board_verifier` contract, ensuring that the position of the battleships is in compliance with the rules, and will not reveal their placement.
 
-* join_game: Bob加入游戏, 与new_game类似，调用board_verifier合约验证其摆放的战舰位置符合规则；
+* join_game: Bob joins the game. Similar to new_game, the placement of his battleships is verified by calling the board_verifier contract.
 
-* first_turn: Alice进行第一次射击,first_turn函数不涉及proof verify；
+* first_turn: Alice takes the first shot. The first_turn function does not involve proof verification.
 
-* turn: Bob射击,此函数会调用shot_verifier验证上一次的射击（Alice的射击）是否命中己方的战舰。
+* turn: Bob takes a shot. This function calls the shot_verifier to verify if the previous shot (Alice's shot) hit his battleships.
 
-后续双方轮流调用`turn`进行游戏交互。
+Afterwards, both parties take turns calling turn to interact with the game.
 
-合约中还定义了其它的交互逻辑，具体请参考[battleship.move](./sources/battleship.move)。
+The contract also defines other interaction logic, please refer to [battleship.move](./sources/battleship.move) for details.
 
 
 
